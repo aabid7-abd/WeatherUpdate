@@ -358,7 +358,7 @@ double getTemp(){
 
 
       final url = Uri.parse(
-          "https://api.openweathermap.org/data/2.5/forecast?q=$_city&units=$_unitt&appid=$aKey");
+          "https://api.openweathermap.org/data/2.5/forecast?q=$_city&units=$_unitt&appid=$openWeatherApiKey");
       try {
 
         final response = await http.get(url);

@@ -1,8 +1,7 @@
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
-const  aKey ="663cb6389bfc8f7ec174a7d58e3fefc8";
-const  openWeatherApiKey ="663cb6389bfc8f7ec174a7d58e3fefc8";
+const  openWeatherApiKey ="your api key";
 Future<String> getCityName() async {
   try {
     // Get current position (latitude and longitude)

@@ -58,7 +58,18 @@ class _HomescreenState extends State<Homescreen> {
     final weatherProvider = Provider.of<WeatherProvider>(context);
     final weatherDescription =
         weatherProvider.weather?.weatherDescription?.toLowerCase() ?? "";
-    return Scaffold(
+    return weatherProvider.weather == null && weatherProvider.forecast == null
+        ? const Scaffold(
+       body: Center(
+     child : Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Colors.blue),
+          SizedBox(height: 20),
+          Text('Fetching....'),
+        ],
+      ),
+    )):Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: weatherProvider.weather != null
           ? weatherProvider.getColorBasedOnWeather(weatherDescription)
@@ -74,6 +85,224 @@ class _HomescreenState extends State<Homescreen> {
               : Image.asset("assets/icons/F.png"),
         ),
       ),
+    );
+  }
+
+  Widget buildWeatherBackground(WeatherProvider weatherProvider) {
+    return Positioned.fill(
+      child: Builder(
+        builder: (context) {
+          final weatherType = weatherProvider.getWeatherType();
+
+          // Map the weather type to the corresponding WeatherScene
+          switch (weatherType) {
+            case "clearSky":
+              return const WrapperScene(
+                colors: [
+                  Color(0xff87ceeb),
+                  Color(0xff4682b4),
+                ],
+                children: [
+                  SunWidget(
+                    sunConfig: SunConfig(
+                      width: 262.0,
+                      blurSigma: 20.0,
+                      blurStyle: BlurStyle.solid,
+                      isLeftLocation: true,
+                      coreColor: Color(0xffffa726),
+                      midColor: Color(0xd6ffee58),
+                      outColor: Color(0xffff9800),
+                      animMidMill: 2000,
+                      animOutMill: 1800,
+                    ),
+                  ),
+                ],
+              );
+            case "cloudy":
+              return WrapperScene(
+                colors: [
+                  const Color(0xffd3d3d3),
+                  const Color(0xffa9a9a9),
+                ],
+                children: [
+                  SizedBox(
+                    width: 950,
+                    height: 470,
+                    child: Transform.scale(
+                      scale: 0.3,
+                      child: const CloudWidget(),
+                    ),
+                  ),
+                  const WindWidget(),
+                  SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: Transform.scale(
+                      scale: 0.4,
+                      child: const CloudWidget(),
+                    ),
+                  ),
+                ],
+              );
+            case "rainyOvercast":
+              return WeatherScene.rainyOvercast.sceneWidget;
+            case "snowfall":
+              return const WrapperScene(
+                colors: [
+                  Color(0xfff8f9fa),
+                  Color(0xffd6d6d6),
+                ],
+                children: [
+                  SnowWidget(),
+                ],
+              );
+            case "thunderstorm":
+              return WeatherScene.stormy.sceneWidget;
+            case "misty":
+              return const WrapperScene(
+                colors: [
+                  Color(0xffe0e0e0),
+                  Color(0xffcfd8dc),
+                ],
+                children: [],
+              );
+            default:
+              return const WrapperScene(
+                colors: [
+                  Color(0xff87ceeb),
+                  Color(0xff4682b4),
+                ],
+                children: [],
+              );
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _mainUI() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+    return
+     weatherProvider.error != null
+        ? Stack(
+      children: [
+        buildWeatherBackground(weatherProvider),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Center(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.2,
+                width: MediaQuery.of(context).size.width * 0.5,
+                child: Image.asset('assets/icons/error.png'),
+              ),
+            ),
+            Text(
+              weatherProvider
+                  .capitalizeEachWord(weatherProvider.error!),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 60,
+          left: 0,
+          width: MediaQuery.of(context).size.width,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28.0),
+            child: _search(),
+          ),
+        ),
+        Positioned(
+          top: 120,
+          left: 40,
+          right: 40,
+          child: _searchbox(weatherProvider),
+        ),
+      ],
+    )
+        : Stack(
+      children: [
+        buildWeatherBackground(weatherProvider),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 60),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: _search(),
+              ),
+              const SizedBox(height: 20),
+              _upperHeader(),
+              _currentInfo(),
+            ],
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.26,
+          left: MediaQuery.of(context).size.width * 0.43,
+          right: 10,
+          child: SizedBox(
+            height: 400,
+            child: _buildWeatherIconAndDescription(
+                weatherProvider, false),
+          ),
+        ),
+        // Center(
+        //   child: ClipPath(
+        //     clipper: WavyClipper(),
+        //     child: Container(
+        //       height: 300,
+        //       width: 300,
+        //       color: Colors.blue,
+        //     ),
+        //   ),
+        // ),
+        Positioned(
+          bottom: 0, // Anchors it to the bottom
+          left: 0,
+          right: 0,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height *
+                  0.4, // Limits height
+            ),
+
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: _threeDayForecast(),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 120, // Anchors it to the bottom
+          left: 40,
+          right: 35,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height *
+                  0.4, // Limits height
+            ),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(40),
+                topLeft: Radius.circular(40),
+              ),
+              color: Colors.white.withOpacity(0.8),
+            ),
+            child: _searchbox(weatherProvider),
+          ),
+        ),
+      ],
     );
   }
 
@@ -160,312 +389,17 @@ class _HomescreenState extends State<Homescreen> {
     );
   }
 
-  Widget _mainUI() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    return weatherProvider.weather == null && weatherProvider.forecast == null
-        ? const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.blue),
-                SizedBox(height: 20),
-                Text('Fetching....'),
-              ],
-            ),
-          )
-        : weatherProvider.error != null
-            ? Stack(
-                children: [
-                  Positioned.fill(
-                    child: Builder(
-                      builder: (context) {
-                        final weatherType = weatherProvider.getWeatherType();
 
-                        // Map the weather type to the corresponding WeatherScene
-                        switch (weatherType) {
-                          case "clearSky":
-                            return const WrapperScene(
-                              colors: [
-                                Color(0xff87ceeb),
-                                Color(0xff4682b4),
-                              ],
-                              children: [
-                                SunWidget(
-                                  sunConfig: SunConfig(
-                                    width: 262.0,
-                                    blurSigma: 20.0,
-                                    blurStyle: BlurStyle.solid,
-                                    isLeftLocation: true,
-                                    coreColor: Color(0xffffa726),
-                                    midColor: Color(0xd6ffee58),
-                                    outColor: Color(0xffff9800),
-                                    animMidMill: 2000,
-                                    animOutMill: 1800,
-                                  ),
-                                ),
-                              ],
-                            );
-                          case "cloudy":
-                            return WrapperScene(
-                              colors: [
-                                const Color(0xffd3d3d3),
-                                const Color(0xffa9a9a9),
-                              ],
-                              children: [
-                                SizedBox(
-                                  width: 950,
-                                  height: 470,
-                                  child: Transform.scale(
-                                    scale: 0.3,
-                                    child: const CloudWidget(),
-                                  ),
-                                ),
-                                const WindWidget(),
-                                SizedBox(
-                                  width: 50,
-                                  height: 50,
-                                  child: Transform.scale(
-                                    scale: 0.4,
-                                    child: const CloudWidget(),
-                                  ),
-                                ),
-                              ],
-                            );
-                          case "rainyOvercast":
-                            return WeatherScene.rainyOvercast.sceneWidget;
-                          case "snowfall":
-                            return const WrapperScene(
-                              colors: [
-                                Color(0xfff8f9fa),
-                                Color(0xffd6d6d6),
-                              ],
-                              children: [
-                                SnowWidget(),
-                              ],
-                            );
-                          case "thunderstorm":
-                            return WeatherScene.stormy.sceneWidget;
-                          case "misty":
-                            return const WrapperScene(
-                              colors: [
-                                Color(0xffe0e0e0),
-                                Color(0xffcfd8dc),
-                              ],
-                              children: [],
-                            );
-                          default:
-                            return const WrapperScene(
-                              colors: [
-                                Color(0xff87ceeb),
-                                Color(0xff4682b4),
-                              ],
-                              children: [],
-                            );
-                        }
-                      },
-                    ),
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Center(
-                        child: SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.2,
-                          width: MediaQuery.of(context).size.width * 0.5,
-                          child: Image.asset('assets/icons/error.png'),
-                        ),
-                      ),
-                      Text(
-                        weatherProvider
-                            .capitalizeEachWord(weatherProvider.error!),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    top: 60,
-                    left: 0,
-                    width: MediaQuery.of(context).size.width,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                      child: _search(),
-                    ),
-                  ),
-                  Positioned(
-                    top: 120,
-                    left: 40,
-                    right: 40,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: _searchbox(weatherProvider),
-                    ),
-                  ),
-                ],
-              )
-            : Stack(
-                children: [
-                  Positioned.fill(
-                    child: Builder(
-                      builder: (context) {
-                        final weatherType = weatherProvider.getWeatherType();
-                        switch (weatherType) {
-                          case "clearSky":
-                            return const WrapperScene(
-                              colors: [Color(0xff87ceeb), Color(0xff4682b4)],
-                              children: [
-                                SunWidget(
-                                  sunConfig: SunConfig(
-                                    width: 262.0,
-                                    blurSigma: 20.0,
-                                    blurStyle: BlurStyle.solid,
-                                    isLeftLocation: true,
-                                    coreColor: Color(0xffffa726),
-                                    midColor: Color(0xd6ffee58),
-                                    outColor: Color(0xffff9800),
-                                    animMidMill: 2000,
-                                    animOutMill: 1800,
-                                  ),
-                                ),
-                              ],
-                            );
-                          case "cloudy":
-                            return WrapperScene(
-                              colors: [
-                                const Color(0xffd3d3d3),
-                                const Color(0xffa9a9a9)
-                              ],
-                              children: [
-                                SizedBox(
-                                  width: 950,
-                                  height: 470,
-                                  child: Transform.scale(
-                                    scale: 0.3,
-                                    child: const CloudWidget(),
-                                  ),
-                                ),
-                                const WindWidget(),
-                                SizedBox(
-                                  width: 50,
-                                  height: 50,
-                                  child: Transform.scale(
-                                    scale: 0.4,
-                                    child: const CloudWidget(),
-                                  ),
-                                ),
-                              ],
-                            );
-                          case "rainyOvercast":
-                            return WeatherScene.rainyOvercast.sceneWidget;
-                          case "snowfall":
-                            return const WrapperScene(
-                              colors: [Color(0xfff8f9fa), Color(0xffd6d6d6)],
-                              children: [SnowWidget()],
-                            );
-                          case "thunderstorm":
-                            return WeatherScene.stormy.sceneWidget;
-                          case "misty":
-                            return const WrapperScene(
-                              colors: [Color(0xffe0e0e0), Color(0xffcfd8dc)],
-                              children: [],
-                            );
-                          default:
-                            return const WrapperScene(
-                              colors: [Color(0xff87ceeb), Color(0xff4682b4)],
-                              children: [],
-                            );
-                        }
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 60),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 30),
-                          child: _search(),
-                        ),
-                        const SizedBox(height: 20),
-                        _uperheader(),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: MediaQuery.of(context).size.height * 0.26,
-                    left: MediaQuery.of(context).size.width * 0.43,
-                    right: 10,
-                    child: SizedBox(
-                      height: 400,
-                      child: _buildWeatherIconAndDescription(
-                          weatherProvider, false),
-                    ),
-                  ),
-                  // Center(
-                  //   child: ClipPath(
-                  //     clipper: WavyClipper(),
-                  //     child: Container(
-                  //       height: 300,
-                  //       width: 300,
-                  //       color: Colors.blue,
-                  //     ),
-                  //   ),
-                  // ),
-                  Positioned(
-                    bottom: 0, // Anchors it to the bottom
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height *
-                            0.4, // Limits height
-                      ),
-
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: _threeDayForecast(),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 120, // Anchors it to the bottom
-                    left: 10,
-                    right: 10,
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height *
-                            0.4, // Limits height
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(40),
-                          topLeft: Radius.circular(40),
-                        ),
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                      child: _searchbox(weatherProvider),
-                    ),
-                  ),
-                ],
-              );
-  }
 
   Widget _searchbox(WeatherProvider weatherProvider) {
     if (weatherProvider.showRecentSearches &&
         weatherProvider.recentSearches.isNotEmpty) {
       return Container(
+        height: 250,
         margin: const EdgeInsets.only(top: 5),
         decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(10.0),
+          color: Colors.white
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,7 +410,7 @@ class _HomescreenState extends State<Homescreen> {
               child: buildText('Recent '),
             ),
             SizedBox(
-              height: 190,
+              height: 150,
               child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: weatherProvider.recentSearches.length,
@@ -503,16 +437,17 @@ class _HomescreenState extends State<Homescreen> {
                 },
               ),
             ),
-            if (weatherProvider.recentSearches.length > 2)
+            if (weatherProvider.recentSearches.length > 2)...[
               const Divider(), // Optional separator
-            if (weatherProvider.recentSearches.length > 2)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'Scroll to see more',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Scroll to see more',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
                 ),
-              ),
+            ]
+
           ],
         ),
       );
@@ -584,21 +519,7 @@ class _HomescreenState extends State<Homescreen> {
     );
   }
 
-  Widget _uperheader() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    if (weatherProvider.weather == null && weatherProvider.error == null) {
-      return const Center(child: Text(''));
-    } else if (weatherProvider.error != null) {
-      return const Center(child: Text(''));
-    } else {
-      return Column(
-        children: [
-          _upperHeader(),
-          _currentInfo(),
-        ],
-      );
-    }
-  }
+
 
   Widget _threeDayForecast() {
     final weatherProvider = Provider.of<WeatherProvider>(context);
