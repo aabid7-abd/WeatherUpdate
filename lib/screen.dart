@@ -34,13 +34,11 @@ class _HomescreenState extends State<Homescreen> {
       print("Error in fetchWeatherData: $e");
     }
 
-    // Use listen: false to avoid listening for changes to the provider
   }
 
   @override
   void initState() {
     super.initState();
-    // Call the async method to fetch weather data
     fetchWeatherData();
     final weatherProvider =
         Provider.of<WeatherProvider>(context, listen: false);
@@ -268,7 +266,7 @@ class _HomescreenState extends State<Homescreen> {
         //   ),
         // ),
         Positioned(
-          bottom: 0, // Anchors it to the bottom
+          bottom: 0,
           left: 0,
           right: 0,
           child: Container(
@@ -284,7 +282,7 @@ class _HomescreenState extends State<Homescreen> {
           ),
         ),
         Positioned(
-          top: 120, // Anchors it to the bottom
+          top: 120,
           left: 40,
           right: 35,
           child: Container(
@@ -346,7 +344,6 @@ class _HomescreenState extends State<Homescreen> {
     final weatherProvider =
         Provider.of<WeatherProvider>(context, listen: false);
 
-    // Mapping of countries to their cities
 
     final cities = weatherProvider.citiesByCountry[country] ?? [];
 
@@ -355,7 +352,7 @@ class _HomescreenState extends State<Homescreen> {
       builder: (context) {
         return AlertDialog(
           title: Text('Select a City in $country'),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,
@@ -372,7 +369,7 @@ class _HomescreenState extends State<Homescreen> {
                     weatherProvider.addCityToRecent(selectedCity);
 
                     print('Selected City: $selectedCity');
-                    Navigator.of(context).pop(); // Close the dialog
+                    Navigator.of(context).pop();
                   },
                 );
               },
@@ -453,7 +450,7 @@ class _HomescreenState extends State<Homescreen> {
       );
     }
     return const SizedBox
-        .shrink(); // Return an empty widget if no recent searches
+        .shrink();
   }
 
   Widget _search() {
@@ -491,10 +488,10 @@ class _HomescreenState extends State<Homescreen> {
                   ),
                 ),
                 prefixIconConstraints: const BoxConstraints(
-                  minWidth: 50, // Set minimum width for spacing
+                  minWidth: 50,
                 ),
                 contentPadding:
-                    const EdgeInsets.only(left: 10), // Add left padding
+                    const EdgeInsets.only(left: 10),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: () {
@@ -623,7 +620,6 @@ class _HomescreenState extends State<Homescreen> {
     );
   }
 
-// Helper function to create weather sections (Morning, Afternoon, Evening)
   Widget _buildWeatherSection(
     int index,
     String timeOfDay,
@@ -665,7 +661,6 @@ class _HomescreenState extends State<Homescreen> {
                   ),
                 ],
               ),
-              // Weather description and icon
               SizedBox(
                 width: 90,
                 child: Column(

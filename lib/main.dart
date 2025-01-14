@@ -13,17 +13,16 @@ Future<void> main() async {
 
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize WeatherProvider and load the preferences
     final weatherProvider = WeatherProvider();
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
-    // Now run the app and provide the WeatherProvider to the widget tree
     runApp(
       ChangeNotifierProvider(
         create: (_) => weatherProvider,
         child: const MyApp(),
       ),
+
     );
   }
 

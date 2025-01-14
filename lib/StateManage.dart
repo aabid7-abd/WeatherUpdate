@@ -386,7 +386,6 @@ double getTemp(){
 
     final Map<String, List<Map<String, dynamic>>> groupedForecast = {};
 
-    // Group forecasts by date
     for (var item in _forecast!) {
       final date = item['dt_txt'].split(' ')[0]; // Extract date
       groupedForecast.putIfAbsent(date, () => []).add(item);
@@ -400,9 +399,8 @@ double getTemp(){
     for (var date in groupedForecast.keys) {
       final forecastDate = DateTime.parse(date);
 
-      // Exclude today and include future dates only
       if (forecastDate.isBefore(today)) {
-        continue; // Skip if it's today's date
+        continue;
       }
 
       if (count > 3) break;
@@ -418,7 +416,6 @@ double getTemp(){
           .map((item) => item['main']['temp'])
           .reduce((a, b) => a < b ? a : b);
 
-      // Get morning, afternoon, and evening forecasts
       final morning = dayForecast.firstWhere(
             (item) => item['dt_txt'].contains('09:00:00'),
         orElse: () => {
@@ -449,11 +446,10 @@ double getTemp(){
         },
       );
 
-      // Add data for the day to result
       result.add({
         'date': date,
-        'highest_temp': highestTemp, // Add highest temperature
-        'lowest_temp': lowestTemp,   // Add lowest temperature
+        'highest_temp': highestTemp,
+        'lowest_temp': lowestTemp,
         'morning': morning,
         'afternoon': afternoon,
         'evening': evening,
@@ -472,12 +468,12 @@ double getTemp(){
     if (input.isEmpty) return input;
 
     return input
-        .split(' ') // Split the string into words
+        .split(' ')
         .map((word) {
-      if (word.isEmpty) return ''; // Handle empty words (e.g., extra spaces)
+      if (word.isEmpty) return '';
       return word[0].toUpperCase() +
-          word.substring(1); // Capitalize the first letter
-    }).join(' '); // Join the words back together
+          word.substring(1);
+    }).join(' ');
   }
 
 
