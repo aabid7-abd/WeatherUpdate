@@ -403,7 +403,7 @@ double getTemp(){
         continue;
       }
 
-      if (count > 3) break;
+
 
       final dayForecast = groupedForecast[date]!;
 

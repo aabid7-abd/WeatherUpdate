@@ -544,13 +544,16 @@ class _HomescreenState extends State<Homescreen> {
                   Row(
                     children: [
                       index == 0
-                          ? Text(
-                              'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black),
-                            )
+                          ? SizedBox(
+                        width: 150,
+                            child: Text(
+                                'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black),
+                              ),
+                          )
                           : Text(
                               "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
                               style: const TextStyle(
@@ -561,27 +564,32 @@ class _HomescreenState extends State<Homescreen> {
                             ),
                     ],
                   ),
-                  Card(
+                  SizedBox(
+                    width: 150,
+                    child: Card(
 
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          buildText(
-                              '${forecastDay['highest_temp'].toInt()} ${weatherProvider.unit}'),
-                          const SizedBox(width: 5),
-                          const Icon(
-                            Icons.arrow_upward,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 5),
-                          buildText(
-                              '${forecastDay['lowest_temp'].toInt()} ${weatherProvider.unit}'),
-                          const Icon(
-                            Icons.arrow_downward,
-                            size: 14,
-                          )
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            buildText(
+                                '${forecastDay['highest_temp'].toInt()} ${weatherProvider.unit}'),
+                            const SizedBox(width: 5),
+                            const Icon(
+                              Icons.arrow_upward,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 5),
+                            buildText(
+                                '${forecastDay['lowest_temp'].toInt()} ${weatherProvider.unit}'),
+                            const Icon(
+                              Icons.arrow_downward,
+                              size: 14,
+                            )
+                          ],
+                        ),
                       ),
                     ),
                   )
