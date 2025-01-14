@@ -52,9 +52,13 @@ flutter pub get
    This will start the app, and you can use it to check the weather for different cities.
 
 6. Access the App
+   
   After running the app, open it on your device or emulator. The app will allow you to:
+  
   Search for the weather of any city.
+  
   View the current temperature, humidity, and weather conditions.
+  
   Get a 5-day weather forecast.
 
 ## Features
