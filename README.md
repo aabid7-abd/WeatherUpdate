@@ -39,7 +39,9 @@ flutter pub get
    
   Open the api.dart file located in the lib folder of the project.
   In the file, you will find a placeholder for the API key like this:
+  
   const  openWeatherApiKey = "YOUR_API_KEY";
+  
   Replace YOUR_API_KEY with the API key you obtained from OpenWeatherMap
 
 5. Run the Application
