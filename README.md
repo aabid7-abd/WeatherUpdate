@@ -74,7 +74,9 @@ flutter pub get
 ## Troubleshooting
 
   "API key not working": Ensure that your API key is correctly set in the api.dart file.
+  
   "App not starting": Make sure you have installed all the dependencies using flutter pub get and that your device/emulator is properly configured.
+  
   "Invalid city": Double-check the spelling of the city name and ensure it is recognized by the OpenWeather API.
 
 
