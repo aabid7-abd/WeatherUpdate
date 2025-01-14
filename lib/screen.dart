@@ -52,27 +52,36 @@ class _HomescreenState extends State<Homescreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final weatherProvider = Provider.of<WeatherProvider>(context);
     final weatherDescription =
         weatherProvider.weather?.weatherDescription?.toLowerCase() ?? "";
+
     return weatherProvider.weather == null && weatherProvider.forecast == null
         ? const Scaffold(
-       body: Center(
-     child : Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: Colors.blue),
-          SizedBox(height: 20),
-          Text('Fetching....'),
-        ],
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.blue),
+            SizedBox(height: 20),
+            Text('Fetching....'),
+          ],
+        ),
       ),
-    )):Scaffold(
+    )
+        : Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent resizing
       extendBodyBehindAppBar: true,
       backgroundColor: weatherProvider.weather != null
           ? weatherProvider.getColorBasedOnWeather(weatherDescription)
           : Colors.white,
-      body: _mainUI(),
+      body: Stack(
+        children: [
+          _mainUI(),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: weatherProvider.toggleUnit,
         child: SizedBox(
@@ -83,6 +92,116 @@ class _HomescreenState extends State<Homescreen> {
               : Image.asset("assets/icons/F.png"),
         ),
       ),
+    );
+  }
+
+  Widget _mainUI() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+    return weatherProvider.error != null
+        ? Stack(
+      children: [
+        buildWeatherBackground(weatherProvider),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Center(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.2,
+                width: MediaQuery.of(context).size.width * 0.5,
+                child: Image.asset('assets/icons/error.png'),
+              ),
+            ),
+            Text(
+              weatherProvider.capitalizeEachWord(weatherProvider.error!),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 60,
+          left: 0,
+          width: MediaQuery.of(context).size.width,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28.0),
+            child: _search(),
+          ),
+        ),
+        Positioned(
+          top: 120,
+          left: 40,
+          right: 40,
+          child: _searchbox(weatherProvider),
+        ),
+      ],
+    )
+        : Stack(
+      children: [
+        buildWeatherBackground(weatherProvider),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 60),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: _search(),
+              ),
+              const SizedBox(height: 20),
+              _upperHeader(),
+              _currentInfo(),
+            ],
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.26,
+          left: MediaQuery.of(context).size.width * 0.43,
+          right: 10,
+          child: SizedBox(
+            height: 400,
+            child: _buildWeatherIconAndDescription(weatherProvider, false),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: _threeDayForecast(),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 120,
+          left: 40,
+          right: 35,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(40),
+                topLeft: Radius.circular(40),
+              ),
+              color: Colors.white.withOpacity(0.8),
+            ),
+            child: _searchbox(weatherProvider),
+          ),
+        ),
+      ],
     );
   }
 
@@ -177,133 +296,6 @@ class _HomescreenState extends State<Homescreen> {
       ),
     );
   }
-
-  Widget _mainUI() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    return
-     weatherProvider.error != null
-        ? Stack(
-      children: [
-        buildWeatherBackground(weatherProvider),
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Center(
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.2,
-                width: MediaQuery.of(context).size.width * 0.5,
-                child: Image.asset('assets/icons/error.png'),
-              ),
-            ),
-            Text(
-              weatherProvider
-                  .capitalizeEachWord(weatherProvider.error!),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        Positioned(
-          top: 60,
-          left: 0,
-          width: MediaQuery.of(context).size.width,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0),
-            child: _search(),
-          ),
-        ),
-        Positioned(
-          top: 120,
-          left: 40,
-          right: 40,
-          child: _searchbox(weatherProvider),
-        ),
-      ],
-    )
-        : Stack(
-      children: [
-        buildWeatherBackground(weatherProvider),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 60),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: _search(),
-              ),
-              const SizedBox(height: 20),
-              _upperHeader(),
-              _currentInfo(),
-            ],
-          ),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).size.height * 0.26,
-          left: MediaQuery.of(context).size.width * 0.43,
-          right: 10,
-          child: SizedBox(
-            height: 400,
-            child: _buildWeatherIconAndDescription(
-                weatherProvider, false),
-          ),
-        ),
-        // Center(
-        //   child: ClipPath(
-        //     clipper: WavyClipper(),
-        //     child: Container(
-        //       height: 300,
-        //       width: 300,
-        //       color: Colors.blue,
-        //     ),
-        //   ),
-        // ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height *
-                  0.4, // Limits height
-            ),
-
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: _threeDayForecast(),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 120,
-          left: 40,
-          right: 35,
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height *
-                  0.4, // Limits height
-            ),
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(40),
-                topLeft: Radius.circular(40),
-              ),
-              color: Colors.white.withOpacity(0.8),
-            ),
-            child: _searchbox(weatherProvider),
-          ),
-        ),
-      ],
-    );
-  }
-
   void showCountriesDialog(BuildContext context) {
     final weatherProvider =
         Provider.of<WeatherProvider>(context, listen: false);
