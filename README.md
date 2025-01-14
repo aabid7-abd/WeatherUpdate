@@ -67,7 +67,7 @@ flutter pub get
   
   Current Weather: Displays current temperature, humidity, and weather conditions.
   
-  Store Recently Seacherd cities.
+  Stores recently seacherd cities.
   
   Forecast: View the 7-day weather forecast.
 
