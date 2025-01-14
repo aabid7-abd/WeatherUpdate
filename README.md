@@ -60,8 +60,11 @@ flutter pub get
 ## Features
 
   City Search: Search for the weather of any city.
+  
   Current Weather: Displays current temperature, humidity, and weather conditions.
+  
   Store Recently Seacherd cities.
+  
   Forecast: View the 7-day weather forecast.
 
 ## Troubleshooting
