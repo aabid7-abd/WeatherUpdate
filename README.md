@@ -25,7 +25,7 @@ https://github.com/abidb7/weatherUpdate.git
    Navigate to the project folder and install the required Flutter dependencies:
 
 ```
-cd weather-app
+cd WeatherUpdate
 flutter pub get
 ```
    This will fetch all the necessary packages required for the project.
