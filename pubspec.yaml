@@ -55,7 +55,7 @@ flutter:
 
   assets:
     - assets/icons/
-    - assets/icons/sunset.png
+
     - assets/lottie/
 
 
