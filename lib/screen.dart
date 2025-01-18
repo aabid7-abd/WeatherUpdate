@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:ui';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:forecast/utility.dart';
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
-import 'package:weather_animation/weather_animation.dart';
 
 import 'Api.dart';
 import 'StateManage.dart';
@@ -16,19 +20,22 @@ class Homescreen extends StatefulWidget {
 
 class _HomescreenState extends State<Homescreen> {
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   Future<void> fetchWeatherData() async {
     try {
+      WeatherProvider weather =
+          Provider.of<WeatherProvider>(context, listen: false);
       String city = await getCityName();
       if (city == "" || city == "Ganderbal") {
-        city = "Srinagar";
-        Provider.of<WeatherProvider>(context, listen: false)
-            .setCity("Srinagar");
-      } else {}
-      Provider.of<WeatherProvider>(context, listen: false).setCity(city);
-      await Provider.of<WeatherProvider>(context, listen: false).fetchd();
-      await Provider.of<WeatherProvider>(context, listen: false)
-          .fetchForecast();
+        weather.setCity = "Srinagar";
+        await weather.fetchd();
+        await weather.fetchForecast();
+      } else {
+        weather.setCity = city;
+        await weather.fetchd();
+        await weather.fetchForecast();
+      }
     } catch (e) {
       // print("Error in fetchWeatherData: $e");
     }
@@ -37,9 +44,22 @@ class _HomescreenState extends State<Homescreen> {
   @override
   void initState() {
     super.initState();
-    fetchWeatherData();
     final weatherProvider =
         Provider.of<WeatherProvider>(context, listen: false);
+
+    weatherProvider.checkConnectivity();
+
+    Connectivity()
+        .onConnectivityChanged
+        .listen((ConnectivityResult result) async {
+      weatherProvider.isconnected = result != ConnectivityResult.none;
+
+      if (weatherProvider.isConnected) {
+        await fetchWeatherData();
+      } else {
+        // print("No internet connection detected.");
+      }
+    });
 
     weatherProvider.fetchRecentSearches();
     weatherProvider.focusNode?.addListener(() {
@@ -49,380 +69,918 @@ class _HomescreenState extends State<Homescreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _connectivitySubscription
+        ?.cancel(); // Cancel subscription to avoid memory leaks
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final weatherProvider = Provider.of<WeatherProvider>(context);
-    final weatherDescription =
-        weatherProvider.weather?.weatherDescription?.toLowerCase() ?? "";
 
     return weatherProvider.weather == null && weatherProvider.forecast == null
-        ? const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.blue),
-                  SizedBox(height: 20),
-                  Text('Fetching....'),
-                ],
-              ),
-            ),
-          )
-        : Scaffold(
-            resizeToAvoidBottomInset: false, // Prevent resizing
-            extendBodyBehindAppBar: true,
-            backgroundColor: weatherProvider.weather != null
-                ? weatherProvider.getColorBasedOnWeather(weatherDescription)
-                : Colors.white,
-            body: Stack(
-              children: [
-                _mainUI(),
-              ],
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: weatherProvider.toggleUnit,
-              child: SizedBox(
-                width: 40,
-                height: 40,
-                child: weatherProvider.unit == "F"
-                    ? Image.asset("assets/icons/celsius.png")
-                    : Image.asset("assets/icons/F.png"),
-              ),
-            ),
-          );
+        ? Scaffold(
+            backgroundColor: Colors.white,
+            body: buildErrorUI('Fetching data......'))
+        : weatherProvider.cityerror != null
+            ? Scaffold(
+                body: Stack(
+                  children: [
+                    buildWeatherBackground(weatherProvider),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Center(
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.2,
+                            width: MediaQuery.of(context).size.width * 0.5,
+                            child: Image.asset('assets/icons/error.png'),
+                          ),
+                        ),
+                        Text(
+                          capitalizeEachWord(weatherProvider.cityerror!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 60,
+                      left: 0,
+                      width: MediaQuery.of(context).size.width,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28.0),
+                        child: _search(),
+                      ),
+                    ),
+                    Positioned(
+                      top: 120,
+                      left: 40,
+                      right: 40,
+                      child: _searchbox(weatherProvider),
+                    ),
+                  ],
+                ),
+              )
+            : Scaffold(
+                resizeToAvoidBottomInset: false, // Prevent resizing
+                extendBodyBehindAppBar: true,
+                body: _mainUI(),
+                floatingActionButton: FloatingActionButton(
+                  onPressed: weatherProvider.toggleUnit,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.0),
+                  ),
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.white,
+                  focusColor: Colors.grey,
+                  hoverColor: Colors.lightBlue,
+                  splashColor: Colors.grey.shade200,
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: weatherProvider.unit == "F"
+                        ? Image.asset("assets/icons/celsius.png")
+                        : Image.asset("assets/icons/F.png"),
+                  ),
+                ));
   }
 
   Widget _mainUI() {
     final weatherProvider = Provider.of<WeatherProvider>(context);
-    double tempfeelslike = weatherProvider.getTemp(weatherProvider.weather?.tempFeelsLike?.celsius ?? 0.0);
-    double tempMax =weatherProvider.getTemp(weatherProvider.weather?.tempMax?.celsius ?? 0.0);
-    double tempMin =weatherProvider.getTemp(weatherProvider.weather?.tempMin?.celsius ?? 0.0);
+    double tempfeelslike = weatherProvider
+        .getTemp(weatherProvider.weather?.tempFeelsLike?.celsius ?? 0.0);
 
-    return weatherProvider.error != null
-        ? Stack(
+
+    return
+      Stack(
+      children: [
+
+        weatherProvider.weather?.weatherDescription=='clear sky'?weatherProvider.isNight?
+          Positioned.fill(
+            child: Lottie.asset(
+              'assets/lottie/lo.json',
+              fit: BoxFit.cover, // Cover the entire background
+            ),
+          ):Positioned.fill(
+         child: Lottie.asset(
+           'assets/lottie/clearday.json',
+           fit: BoxFit.cover, // Cover the entire background
+         ),
+       ): buildWeatherBackground(weatherProvider),
+
+
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              buildWeatherBackground(weatherProvider),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Center(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.2,
-                      width: MediaQuery.of(context).size.width * 0.5,
-                      child: Image.asset('assets/icons/error.png'),
-                    ),
-                  ),
-                  Text(
-                    weatherProvider.capitalizeEachWord(weatherProvider.error!),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 60),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: _search(),
               ),
-              Positioned(
-                top: 60,
-                left: 0,
-                width: MediaQuery.of(context).size.width,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                  child: _search(),
-                ),
-              ),
-              Positioned(
-                top: 120,
-                left: 40,
-                right: 40,
-                child: _searchbox(weatherProvider),
-              ),
-            ],
-          )
-        : Stack(
-            children: [
-              buildWeatherBackground(weatherProvider),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 60),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 30),
-                      child: _search(),
-                    ),
-                    const SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _upperHeader(),
-                          const Padding(
-                            padding: EdgeInsets.only(left: 10.0,top: 10),
-                            child: Text(
-                              'Now',
-                              style: TextStyle(color: Colors.white, fontSize: 25),
-                            ),
-                          ),
-                          _currentInfo(),
-                        ],
+                    _upperHeader(),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 10.0, top: 10),
+                      child: Text(
+                        'Now',
+                        style: TextStyle(color: Colors.white, fontSize: 25,fontWeight: FontWeight.w700),
                       ),
                     ),
+                    _currentInfo(),
+                    Card(
+                        elevation: 22,
+                        color: getColorBasedOnWeather(
+                                weatherProvider.weather?.weatherDescription ??
+                                    " ")
+                            .withOpacity(0.6),
+                        child: _extraCurrentInfo()),
                   ],
                 ),
               ),
-              Positioned(
-                top: MediaQuery.of(context).size.height * 0.25,
-                left: MediaQuery.of(context).size.width * 0.65,
-                right: 10,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        weatherProvider.weather?.weatherDescription != null
-                            ? weatherProvider.capitalizeEachWord(
-                            weatherProvider.weather!.weatherDescription!)
-                            : 'No description available',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        'Feels like ${tempfeelslike.toStringAsFixed(0)} ${weatherProvider.unit}',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 15,fontWeight: FontWeight.w600),
-                      ),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          _buildMinMax(
-                                  temperatureMax: tempMax,
-                                  temperatureMin: tempMin,
-                                  unit: weatherProvider.unit,
-                                )
-
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.45,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: _threeDayForecast(),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 120,
-                left: 40,
-                right: 35,
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.4,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(40),
-                      topLeft: Radius.circular(40),
-                    ),
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                  child: _searchbox(weatherProvider),
-                ),
-              ),
             ],
-          );
-  }
+          ),
+        ),
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.25,
 
-  Widget _currentInfo() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    double temperature = weatherProvider.getTemp(weatherProvider.weather?.temperature?.celsius ?? 0.0);
-    final weatherDescription =
-        weatherProvider.weather?.weatherDescription?.toLowerCase() ?? "";
+          right: 20,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: 140,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center
+                  ,crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      weatherProvider.weather?.weatherDescription != null
+                          ? capitalizeEachWord(
+                          weatherProvider.weather!.weatherDescription!)
+                          : 'No description available',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Feels like ${tempfeelslike.toStringAsFixed(0)} ${weatherProvider.unit}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600),
+                    ),
 
+                    sun('r',DateFormat("h:mm a").format(
+                        weatherProvider.citySunrise ?? DateTime.now()),'assets/icons/sr2.png',context),
+                    const SizedBox(
+                      height: 5,
+                    ),
+                    sun('s',DateFormat("h:mm a").format(
+                        weatherProvider.citySunset ?? DateTime.now()),'assets/icons/sunset-2.png',context)
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-
-        Row(
-          children: [
-
-            Text(
-              temperature.toStringAsFixed(0),
-              style: const TextStyle(color: Colors.white, fontSize: 100),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 65.0),
-              child: Text(
-                weatherProvider.unit,
-                style: const TextStyle(color: Colors.white, fontSize: 40),
+                  ],
+                ),
               ),
             ),
-            _buildWeatherIcon(weatherProvider),
-          ],
+          ),
         ),
-        const SizedBox(
-          height: 10,
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.42,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: _threeDayForecast(),
+            ),
+          ),
         ),
-        Card(
-            elevation: 22,
-            color: weatherProvider
-                .getColorBasedOnWeather(weatherDescription)
-                .withOpacity(0.6),
-            child: _extraCurrentInfo()),
+        Positioned(
+          top: 120,
+          left: 40,
+          right: 35,
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(40),
+                topLeft: Radius.circular(40),
+              ),
+              color: Colors.white.withOpacity(0.8),
+            ),
+            child: _searchbox(weatherProvider),
+          ),
+        ),
       ],
     );
   }
 
-  Widget buildWeatherBackground(WeatherProvider weatherProvider) {
-    return Positioned.fill(
-      child: Builder(
-        builder: (context) {
-          final weatherType = weatherProvider.getWeatherType();
+  //current weather section
+  Widget _upperHeader() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+    DateTime now = weatherProvider.cityLocalTime!;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.location_pin,
+                color: Colors.white,
+                size: 27,
+              ),
+              Text(
+                '${weatherProvider.weather?.areaName},',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 27,
+                    fontWeight: FontWeight.bold),
+              ),
+              Text(
+                weatherProvider.weather?.country ?? "",
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 27,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(
+          height: 10,
+        ),
+        Row(
+          children: [
+            Text(
+                '   Today, ${DateFormat("d MMM y").format(now)}, ${DateFormat("h:mm a").format(now)}',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ],
+    );
+  }
 
+  Widget _currentInfo() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+    double temperature = weatherProvider
+        .getTemp(weatherProvider.weather?.temperature?.celsius ?? 0.0);
 
-          // Map the weather type to the corresponding WeatherScene
-          switch (weatherType) {
-            case "clearSky":
-              return const WrapperScene(
-                colors: [
-                  Color(0xff87ceeb),
-                  Color(0xff4682b4),
-                ],
-                children: [
-                  SunWidget(
-                    sunConfig: SunConfig(
-                      width: 262.0,
-                      blurSigma: 20.0,
-                      blurStyle: BlurStyle.solid,
-                      isLeftLocation: true,
-                      coreColor: Color(0xffffa726),
-                      midColor: Color(0xd6ffee58),
-                      outColor: Color(0xffff9800),
-                      animMidMill: 2000,
-                      animOutMill: 1800,
-                    ),
-                  ),
-                ],
-              );
-            case "cloudy":
-              return WrapperScene(
-                colors: const [
-                  Color(0xffd3d3d3),
-                  Color(0xffa9a9a9),
-                ],
-                children: [
+    return Row(
+      children: [
+        Text(
+          temperature.toStringAsFixed(0),
+          style:  TextStyle(color: weatherProvider.isNight && weatherProvider.weather?.weatherDescription=="clear sky"?const Color(0xff0f2027):Colors.white, fontSize: 100,fontWeight: FontWeight.w700),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 65.0),
+          child: Text(
+            weatherProvider.unit,
+            style: const TextStyle(color: Colors.white, fontSize: 40),
+          ),
+        ),
+        weatherProvider.isNight && weatherProvider.weather?.weatherDescription=="clear sky"?const SizedBox(): buildWeatherIcon(weatherProvider),
+      ],
+    );
+  }
 
+  Widget _extraCurrentInfo() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
 
-                  SizedBox(
-                    width: 120,
-                    height: 50,
-                    child: Transform.scale(
-                      scale: 0.4,
-                      child: const CloudWidget(),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 120,
-                    height: 50,
-                    child: Transform.scale(
-                      scale: 0.4,
-                      child: const CloudWidget(),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 120,
-                    height: MediaQuery.of(context).size.height*1,
-                    child: Transform.scale(
-                      scale: 0.4,
-                      child: const CloudWidget(),
-                    ),
-                  ),
-                ],
-              );
-            case "rainyOvercast":
-              return WeatherScene.rainyOvercast.sceneWidget;
-            case "snowfall":
-              return const WrapperScene(
-                colors: [
-                  Color(0xfff8f9fa),
-                  Color(0xffd6d6d6),
-                ],
-                children: [
-                  SnowWidget(),
-                ],
-              );
-            case "thunderstorm":
-              return WeatherScene.stormy.sceneWidget;
-            case "misty":
-              return const WrapperScene(
-                colors: [
-                  Color(0xffe0e0e0),
-                  Color(0xffcfd8dc),
-                ],
-                children: [],
-              );
-            case "haze":
-              return const  WrapperScene(
-                colors: [
-                  Color(0xffd7ccc8), // Light haze with a soft brownish-gray tint
-                  Color(0xffc7c3be), // Slightly darker haze with a hint of yellowish-gray
-                ],
-                children: [],
-              );
-            case "mist":
-              return const WrapperScene(
-                colors: [
-                  Color(0xffd3e7ee), // Light mist with a bluish-gray tone
-                  Color(0xffbcc8d3), // Slightly deeper gray-blue mist
-                ],
-                children: [],
-              );
-            case "fog":
-              return const WrapperScene(
-                colors: [
-                  Color(0xffd0d6db), // Soft foggy gray
-                  Color(0xffa9b1b7), // Dense, darker fog
-                ],
-                children: [],
-              );
-            default:
-
-
-              return const WrapperScene(
-                colors:[
-                  Color(0xff87ceeb),
-                  Color(0xff4682b4),               ],
-                children: [],
-              );
-          }
-        },
+    return Container(
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(10)),
+      ),
+      width: double.maxFinite,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            buildWeatherInfoColumn(
+                value:
+                    '${weatherProvider.weather?.humidity?.toStringAsFixed(0)} %',
+                label: getHumidityLevelDescription(
+                    weatherProvider.weather!.humidity!.toDouble()),
+                path: 'assets/icons/humi.png'),
+            buildWeatherInfoColumn(
+                value:
+                    getWindSpeed(weatherProvider.weather?.windSpeed, context),
+                label:
+                    getWindSpeedDescription(weatherProvider.weather?.windSpeed),
+                fontSize: 16,
+                path: 'assets/icons/wind.png'),
+            buildWeatherInfoColumn(
+                value:
+                    '${weatherProvider.weather?.pressure?.toStringAsFixed(0)} hPa ',
+                label:
+                    getPressureLevel(weatherProvider.weather!.pressure ?? 0.0),
+                path: 'assets/icons/pres.png'),
+          ],
+        ),
       ),
     );
+  }
+
+  //forecast section
+  Widget _threeDayForecast() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+
+    return ListView.builder(
+      itemCount: weatherProvider.getThreeDayForecast().length,
+      itemBuilder: (context, index) {
+        final forecastDay = weatherProvider.getThreeDayForecast()[index];
+        double? windSpeedM = double.tryParse(
+            forecastDay['morning']['wind']['speed']?.toString() ?? '');
+        double? windSpeedA = double.tryParse(
+            forecastDay['afternoon']['wind']['speed']?.toString() ?? '');
+        double? windSpeedE = double.tryParse(
+            forecastDay['evening']['wind']['speed']?.toString() ?? '');
+
+        double? windSpeedNoon = double.tryParse(
+            forecastDay['noon']['wind']['speed']?.toString() ?? '');
+        double? windSpeednight = double.tryParse(
+            forecastDay['night']['wind']['speed']?.toString() ?? '');
+
+        // Safely parse temperatures and convert to double
+        double highestTemp = forecastDay['highest_temp']?.toDouble() ?? 0.0;
+        double lowestTemp = forecastDay['lowest_temp']?.toDouble() ?? 0.0;
+
+        double conhightemp = weatherProvider.getTemp(highestTemp);
+        double conLowtemp = weatherProvider.getTemp(lowestTemp);
+
+        return InkWell(
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              builder: (context) => forecast(
+                context,
+                index,
+                forecastDay,
+                windSpeedM,
+                windSpeedNoon,
+                windSpeedA,
+                windSpeedE,
+                windSpeednight,
+              ),
+              backgroundColor: getColorBasedOnWeather(
+                      weatherProvider.weather?.weatherDescription ?? " ")
+                  .withOpacity(0.8),
+              elevation: 8.0, // Elevation of the bottom sheet
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(20), // Rounded top corners
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+
+              isScrollControlled:
+                  true, // Allow the bottom sheet to expand beyond default height
+              isDismissible: true, // Allow dismissing by tapping outside
+              enableDrag: true, // Allow dragging the sheet to dismiss
+              showDragHandle: true, // Show a drag handle on top of the sheet
+              useSafeArea: true, // Avoid system UI overlaps
+              // routeSettings: RouteSettings(name: 'ForecastSheet'), // Custom route settings
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: index == 0
+                  ? Colors.grey.shade50
+                  : index == 1
+                      ? Colors.grey.shade100
+                      : Colors.grey.shade200,
+            ),
+            margin: const EdgeInsets.only(bottom: 40),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  index == 0
+                      ? SizedBox(
+                          width: 150,
+                          child: Text(
+                            'Today${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black),
+                          ),
+                        )
+                      : index == 1
+                          ? SizedBox(
+                              width: 150,
+                              child: Text(
+                                'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black),
+                              ),
+                            )
+                          : Text(
+                              "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                  SizedBox(
+                    width: 150,
+                    child: Card(
+                      elevation: 12,
+                      color: getColorBasedOnWeather(
+                              weatherProvider.weather!.weatherDescription ?? "")
+                          .withOpacity(0.9),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            buildText(
+                                input:
+                                    '${conhightemp.ceil()} ${weatherProvider.unit}'),
+                            const SizedBox(width: 5),
+                            buildText(input: '/'),
+                            const SizedBox(width: 5),
+                            const Icon(
+                              Icons.arrow_upward,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 5),
+                            buildText(
+                                input:
+                                    '${conLowtemp.ceil()} ${weatherProvider.unit}'),
+                            const Icon(
+                              Icons.arrow_downward,
+                              size: 14,
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget forecast(
+    BuildContext context,
+    index,
+    forecastDay,
+    windSpeedM,
+    windSpeedNoon,
+    windSpeedA,
+    windSpeedE,
+    windSpeednight,
+  ) {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+
+    return Scaffold(
+        backgroundColor: Colors.grey.shade300,
+        resizeToAvoidBottomInset: false, // Prevent resizing
+        extendBodyBehindAppBar: true,
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                index == 0
+                    ? Text(
+                        'Today${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black),
+                      )
+                    : index == 1
+                        ? Text(
+                            'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black),
+                          )
+                        : Text(
+                            "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                const SizedBox(
+                  height: 20,
+                ),
+                _buildWeatherForecastSection(
+                  index!,
+                  "Morning   ",
+                  forecastDay['morning'],
+                  windSpeedM,
+                  weatherProvider.unit,
+                  weatherProvider,
+                ),
+                _buildWeatherForecastSection(
+                  index,
+                  "Noon         ",
+                  forecastDay['noon'],
+                  windSpeedNoon,
+                  weatherProvider.unit,
+                  weatherProvider,
+                ),
+                _buildWeatherForecastSection(
+                  index,
+                  "Afternoon",
+                  forecastDay['afternoon'],
+                  windSpeedA,
+                  weatherProvider.unit,
+                  weatherProvider,
+                ),
+                _buildWeatherForecastSection(
+                  index,
+                  "Evening    ",
+                  forecastDay['evening'],
+                  windSpeedE,
+                  weatherProvider.unit,
+                  weatherProvider,
+                ),
+                _buildWeatherForecastSection(
+                  index,
+                  "Night        ",
+                  forecastDay['night'],
+                  windSpeednight,
+                  weatherProvider.unit,
+                  weatherProvider,
+                ),
+              ],
+            ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: weatherProvider.toggleUnit,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.white,
+          focusColor: Colors.grey,
+          hoverColor: Colors.lightBlue,
+          splashColor: Colors.grey.shade200,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: weatherProvider.unit == "F"
+                ? Image.asset("assets/icons/celsius.png")
+                : Image.asset("assets/icons/F.png"),
+          ),
+        ));
+  }
+
+  Widget _buildWeatherForecastSection(
+    int index,
+    String timeOfDay,
+    dynamic forecast,
+    double? windSpeed,
+    String unit,
+    WeatherProvider weather,
+  ) {
+    final sectionKey = '$index-$timeOfDay';
+
+    double temp = forecast['main']['temp']?.toDouble() ?? 0.0;
+    double convertedTemp = weather.getTemp(temp);
+    double humid = forecast['main']['humidity']?.toDouble() ?? 0.0;
+    double pres = forecast['main']['sea_level']?.toDouble() ?? 0.0;
+    String weatherDescription =
+        forecast['weather'][0]['description'] ?? "Not available";
+
+    return SizedBox(
+      width: MediaQuery.of(context).size.width * 1,
+      child: weatherDescription == "Not available"
+          ? const SizedBox(
+              height: 2,
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          timeOfDay,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black.withOpacity(0.6),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            weather.toggleExpandState(sectionKey);
+                          },
+                          icon: Icon(weather.isExpanded(sectionKey)
+                              ? Icons.arrow_drop_up
+                              : Icons.arrow_drop_down),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        weatherDescription != "clear sky"
+                            ? Image.network(
+                                'https://openweathermap.org/img/wn/${forecast['weather'][0]['icon']}@4x.png',
+                                width: 50,
+                                height: 50,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset('assets/icons/bad.png',
+                                      width: 50, height: 50);
+                                },
+                              )
+                            : timeOfDay == "Morning" || timeOfDay == "Afternoon"
+                                ? Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: const BoxDecoration(
+                                      image: DecorationImage(
+                                        image:
+                                            AssetImage('assets/icons/sun.png'),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: const BoxDecoration(
+                                      image: DecorationImage(
+                                        image:
+                                            AssetImage('assets/icons/moon.png'),
+                                      ),
+                                    ),
+                                  ),
+                        const SizedBox(
+                          height: 10,
+                        ),
+                        buildText(
+                            input: capitalizeEachWord(weatherDescription)),
+                      ],
+                    ),
+                    const SizedBox(width: 5),
+                    buildWeatherInfoColumn(
+                      value: '${convertedTemp.toInt()} $unit',
+                      label: 'Temperature',
+                      fontSize: 16,
+                      color: Colors.black,
+                      path: 'assets/icons/temp.png',
+                    ),
+                  ],
+                ),
+                weather.isExpanded(sectionKey)
+                    ? Card(
+                        elevation: 12,
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.8,
+                          decoration: BoxDecoration(
+                            color: getColorBasedOnWeather(
+                                    weather.weather?.weatherDescription ?? "")
+                                .withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                buildWeatherInfoColumn(
+                                  value: '${forecast['main']['humidity']} %',
+                                  label: getHumidityLevelDescription(humid),
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                  path: 'assets/icons/humi.png',
+                                ),
+                                buildWeatherInfoColumn(
+                                  value: getWindSpeed(windSpeed, context),
+                                  label: getWindSpeedDescription(windSpeed),
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                  path: 'assets/icons/wind.png',
+                                ),
+                                buildWeatherInfoColumn(
+                                  value: '${forecast['main']['sea_level']} hPa',
+                                  label: getPressureLevel(pres),
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                  path: 'assets/icons/pres.png',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(),
+                const SizedBox(
+                  height: 40,
+                )
+              ],
+            ),
+    );
+  }
+
+  //search stuff
+  Widget _search() {
+    final weatherProvider = Provider.of<WeatherProvider>(context);
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.0),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: weatherProvider.focusNode,
+              style: TextStyle(
+                  color: weatherProvider.isNight ? Colors.white : Colors.black,
+                  fontSize: 16),
+              decoration: InputDecoration(
+                hintText: "Plan your day – search for the city weather!",
+                hintStyle: TextStyle(
+                    color:
+                        weatherProvider.isNight ? Colors.white : Colors.black,
+                    fontSize: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: const BorderSide(color: Colors.white),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: const BorderSide(color: Colors.blue),
+                ),
+                prefixIcon: IconButton(
+                  onPressed: () => showCountriesDialog(context),
+                  icon: const Icon(
+                    Icons.location_city,
+                    size: 30,
+                    color: Colors.white,
+                  ),
+                ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 50,
+                ),
+                contentPadding: const EdgeInsets.only(left: 10),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () {
+                    // Close the keyboard
+                    FocusScope.of(context).unfocus();
+
+                    final city = _searchController.text;
+                    if (city.isNotEmpty) {
+                      if (weatherProvider.isConnected) {
+                        weatherProvider.setCity = city;
+                        weatherProvider.addCityToRecent(city);
+                        weatherProvider.fetchd();
+                        weatherProvider.fetchForecast();
+                        weatherProvider.addCityToRecent(city);
+                      } else {
+                        showTopSnackBar(context);
+                      }
+                      weatherProvider.setShowRecentSearches(false);
+                    }
+                  },
+                ),
+              ),
+              onTap: () {
+                weatherProvider.setShowRecentSearches(true);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchbox(WeatherProvider weatherProvider) {
+    if (weatherProvider.showRecentSearches &&
+        weatherProvider.recentSearches.isNotEmpty) {
+      return Container(
+        height: 250,
+        margin: const EdgeInsets.only(top: 5),
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10.0), color: Colors.white),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 10.0, top: 10),
+              child: buildText(input: 'Recent '),
+            ),
+            SizedBox(
+              height: 150,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: weatherProvider.recentSearches.length,
+                itemBuilder: (context, index) {
+                  final city = weatherProvider.recentSearches[index];
+                  return ListTile(
+                    title: InkWell(
+                        onTap: () {
+                          // Close the keyboard
+                          FocusScope.of(context).unfocus();
+
+                          _searchController.text = city;
+                          if (weatherProvider.isConnected) {
+                            weatherProvider.setCity = (city);
+                            weatherProvider.addCityToRecent(city);
+                            weatherProvider.fetchd();
+                            weatherProvider.fetchForecast();
+                          } else {
+                            showTopSnackBar(context);
+                          }
+
+                          weatherProvider.setShowRecentSearches(false);
+                        },
+                        child: Text(city)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.black),
+                      onPressed: () {
+                        weatherProvider.removeCityFromRecent(city);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (weatherProvider.recentSearches.length > 2) ...[
+              const Divider(), // Optional separator
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Scroll to see more',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ),
+            ]
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   void showCountriesDialog(BuildContext context) {
@@ -433,7 +991,7 @@ class _HomescreenState extends State<Homescreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Select a Country'),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,
@@ -483,7 +1041,7 @@ class _HomescreenState extends State<Homescreen> {
                   onTap: () {
                     final selectedCity = cities[index];
                     _searchController.text = selectedCity;
-                    weatherProvider.setCity(selectedCity);
+                    weatherProvider.setCity = selectedCity;
                     weatherProvider.fetchd();
                     weatherProvider.fetchForecast();
                     weatherProvider.addCityToRecent(selectedCity);
@@ -505,652 +1063,8 @@ class _HomescreenState extends State<Homescreen> {
       },
     );
   }
-
-  Widget _searchbox(WeatherProvider weatherProvider) {
-    if (weatherProvider.showRecentSearches &&
-        weatherProvider.recentSearches.isNotEmpty) {
-      return Container(
-        height: 250,
-        margin: const EdgeInsets.only(top: 5),
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10.0), color: Colors.white),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 10.0, top: 10),
-              child: buildText('Recent '),
-            ),
-            SizedBox(
-              height: 150,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: weatherProvider.recentSearches.length,
-                itemBuilder: (context, index) {
-                  final city = weatherProvider.recentSearches[index];
-                  return ListTile(
-                    title: InkWell(
-                        onTap: () {
-                          _searchController.text = city;
-                          weatherProvider.setCity(city);
-                          weatherProvider.addCityToRecent(city);
-                          weatherProvider.fetchd();
-                          weatherProvider.fetchForecast();
-                          weatherProvider.setShowRecentSearches(false);
-                        },
-                        child: Text(city)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.cancel, color: Colors.black),
-                      onPressed: () {
-                        weatherProvider.removeCityFromRecent(city);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (weatherProvider.recentSearches.length > 2) ...[
-              const Divider(), // Optional separator
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'Scroll to see more',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ),
-            ]
-          ],
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-
-  Widget _search() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    return Container(
-      height: 60,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10.0),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              focusNode: weatherProvider.focusNode,
-              style: const TextStyle(color: Colors.black, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: 'Enter City',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: const BorderSide(color: Colors.white),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: const BorderSide(color: Colors.blue),
-                ),
-                prefixIcon: IconButton(
-                  onPressed: () => showCountriesDialog(context),
-                  icon: const Icon(
-                    Icons.location_city,
-                    size: 30,
-                    color: Colors.white,
-                  ),
-                ),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 50,
-                ),
-                contentPadding: const EdgeInsets.only(left: 10),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {
-                    final city = _searchController.text;
-                    if (city.isNotEmpty) {
-                      weatherProvider.setCity(city);
-                      weatherProvider.fetchd();
-                      weatherProvider.fetchForecast();
-                      weatherProvider.addCityToRecent(city);
-                      weatherProvider.setShowRecentSearches(false);
-                    }
-                  },
-                ),
-              ),
-              onTap: () {
-                weatherProvider.setShowRecentSearches(true);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _threeDayForecast() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-
-    return ListView.builder(
-      itemCount: weatherProvider.getThreeDayForecast().length,
-      itemBuilder: (context, index) {
-        final forecastDay = weatherProvider.getThreeDayForecast()[index];
-        double? windSpeedM = double.tryParse(
-            forecastDay['morning']['wind']['speed']?.toString() ?? '');
-        double? windSpeedA = double.tryParse(
-            forecastDay['afternoon']['wind']['speed']?.toString() ?? '');
-        double? windSpeedE = double.tryParse(
-            forecastDay['evening']['wind']['speed']?.toString() ?? '');
-
-        // Safely parse temperatures and convert to double
-        double highestTemp = forecastDay['highest_temp']?.toDouble() ?? 0.0;
-        double lowestTemp = forecastDay['lowest_temp']?.toDouble() ?? 0.0;
-
-        double conhightemp = weatherProvider.getTemp(highestTemp);
-        double conLowtemp = weatherProvider.getTemp(lowestTemp);
-
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: index == 0
-                ? Colors.grey.shade50
-                : index == 1
-                    ? Colors.grey.shade100
-                    : Colors.grey.shade200,
-          ),
-          margin: const EdgeInsets.only(bottom: 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(
-                height: 40,
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    children: [
-                      index == 0
-                          ? SizedBox(
-                              width: 150,
-                              child: Text(
-                                'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black),
-                              ),
-                            )
-                          : Text(
-                              "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                    ],
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: Card(
-                      elevation: 12,
-                      color: weatherProvider.getColorBasedOnWeather(weatherProvider.weather!.weatherDescription ?? "").withOpacity(0.9),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            buildText(
-                                '${conhightemp.ceil()} ${weatherProvider.unit}'),
-                            const SizedBox(width: 5),
-                            buildText(
-                                '/'),
-                            const SizedBox(width: 5),
-                            const Icon(
-                              Icons.arrow_upward,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 5),
-                            buildText(
-                                '${conLowtemp.ceil()} ${weatherProvider.unit}'),
-                            const Icon(
-                              Icons.arrow_downward,
-                              size: 14,
-                            )
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: _buildWeatherForecastSection(
-                    index,
-                    "Morning",
-                    forecastDay['morning'],
-                    windSpeedM,
-                    weatherProvider.unit,
-                    weatherProvider,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: _buildWeatherForecastSection(
-                    index,
-                    "Afternoon",
-                    forecastDay['afternoon'],
-                    windSpeedA,
-                    weatherProvider.unit,
-                    weatherProvider,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: _buildWeatherForecastSection(
-                    index,
-                    "Evening",
-                    forecastDay['evening'],
-                    windSpeedE,
-                    weatherProvider.unit,
-                    weatherProvider,
-                    ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildWeatherForecastSection(
-      int index,
-      String timeOfDay,
-      dynamic forecast,
-      double? windSpeed,
-      String unit,
-      WeatherProvider weather,
-      ) {
-    final sectionKey = '$index-$timeOfDay';
-
-    // Determine the temperature based on the unit
-    double temp = forecast['main']['temp'].toDouble();
-    double convertedTemp =weather.getTemp(temp);
-
-
-
-    return SizedBox(
-      width: MediaQuery.of(context).size.width * 1,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    timeOfDay,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey.withOpacity(0.9),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      weather.toggleExpandState(sectionKey);
-                    },
-                    icon: Icon(weather.isExpanded(sectionKey)
-                        ? Icons.arrow_drop_up
-                        : Icons.arrow_drop_down),
-                  ),
-                ],
-              ),
-              SizedBox(
-                width: 90,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    forecast['weather'][0]['description'] != "clear sky"
-                        ?
-                    Image.network(
-                      'https://openweathermap.org/img/wn/${forecast['weather'][0]['icon']}@4x.png',
-                      width: 50,
-                      height: 50,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Image.asset('assets/icons/bad.png',
-                            width: 50, height: 50);
-                      },
-                    )
-                        :timeOfDay=="Morning"||timeOfDay=="Afternoon"? Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/icons/sun.png'),
-                        ),
-                      ),
-                    ):Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/icons/moon.png'),
-                        ),
-                      ),
-                    ),
-                    buildText(weather.capitalizeEachWord(
-                        '${forecast['weather'][0]['description']}')),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          weather.isExpanded(sectionKey)
-              ? Card(
-            elevation: 12,
-            child: Container(
-              decoration: BoxDecoration(
-                  color: weather
-                      .getColorBasedOnWeather(
-                      weather.weather?.weatherDescription ?? "")
-                      .withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(10)),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      SizedBox(
-                        width: 90,
-                        child: _buildWeatherInfoColumn(
-
-                            value: '${convertedTemp.toInt()} $unit',
-                            label: 'Temperature',
-                            fontSize: 16,
-                            color: Colors.black,
-                            path:'assets/icons/temp.png'
-                        ),
-                      ),
-                      SizedBox(
-                        width: 90,
-                        child:
-                        _buildWeatherInfoColumn(
-
-                            value: '${forecast['main']['humidity']} %,',
-                            label: 'Humidity',
-                            fontSize: 16,
-                            color: Colors.black,
-                            path:'assets/icons/humi.png'
-                        ),
-                      ),
-                      SizedBox(
-                        width: 100,
-                        child:
-                        _buildWeatherInfoColumn(
-
-                          value: getWindSpeed(windSpeed, context),
-                          label: getWindSpeedDescription(windSpeed),
-                          fontSize: 16,
-                          color: Colors.black,
-                          path:'assets/icons/wind.png'
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          )
-              : const SizedBox(),
-        ],
-      ),
-    );
-  }
-
-
-  Widget buildText(String input) {
-    return Text(
-      input,
-      style: const TextStyle(
-        fontSize: 14,
-        color: Colors.black,
-      ),
-    );
-  }
-
-  Widget _upperHeader() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    DateTime now = weatherProvider.cityLocalTime!;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              const Icon(
-                Icons.location_pin,
-                color: Colors.white,
-                size: 27,
-              ),
-              Text(
-                '${weatherProvider.weather?.areaName},' ?? "",
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 27,
-                    fontWeight: FontWeight.bold),
-              ),
-              Text(
-                weatherProvider.weather?.country ?? "",
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 27,
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(
-          height: 10,
-        ),
-        Row(
-          children: [
-            Text(
-                '   Today, ${DateFormat("d MMM y").format(now)}, ${DateFormat("h:mm a").format(now)}',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ],
-    );
-  }
-
-
-  Widget _buildWeatherIcon(WeatherProvider weatherProvider) {
-    bool isNight = weatherProvider.isNight;
-    final weatherDescription =
-        weatherProvider.weather?.weatherDescription?.toLowerCase() ?? "";
-    if(weatherDescription == "clear sky") {
-      return !isNight?Container(
-        width: 60,
-        height: 60,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/icons/sun.png'),
-          ),
-        ),
-      ):Container(
-        width: 60,
-        height: 60,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/icons/night.png'),
-          ),
-        ),
-      );
-    } else {
-      return Container(
-        width: 90,
-        height: 90,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-              'https://openweathermap.org/img/wn/${weatherProvider.weather?.weatherIcon}@4x.png',
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-
-
-  Widget _buildMinMax(
-      {double? temperatureMax, double? temperatureMin, required String unit}) {
-    return Row(
-      children: [
-        const Icon(Icons.arrow_upward, color: Colors.white, size: 15),
-        const SizedBox(width: 5),
-        Text(
-          '${temperatureMax?.toStringAsFixed(0)} $unit',
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
-        ),
-
-
-        const SizedBox(width: 10),
-        const Text('/', style: TextStyle(
-            color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          '${temperatureMin?.toStringAsFixed(0)} $unit',
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
-        ),
-        const Icon(Icons.arrow_downward, size: 15, color: Colors.white)
-      ],
-    );
-  }
-
-  Widget _extraCurrentInfo() {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-
-
-    return Container(
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(10)),
-      ),
-      width: double.maxFinite,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildWeatherInfoColumn(
-              value:
-                  '${weatherProvider.weather?.humidity?.toStringAsFixed(0)} %',
-              label: 'Humidity',
-              path: 'assets/icons/humi.png'
-            ),
-            _buildWeatherInfoColumn(
-              value: getWindSpeed(weatherProvider.weather?.windSpeed, context),
-              label:
-                  getWindSpeedDescription(weatherProvider.weather?.windSpeed),
-              fontSize: 16,
-                path: 'assets/icons/wind.png'
-            ),
-            _buildWeatherInfoColumn(
-              value: '${weatherProvider.weather?.pressure} ',
-              label: 'Pressure',
-                path: 'assets/icons/pres.png'
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWeatherInfoColumn({
-    required String value,
-    required String label,
-    Color color = Colors.white,
-    double fontSize = 14,
-    required String path
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration:  BoxDecoration(
-
-            borderRadius: BorderRadius.circular(20),
-            image: DecorationImage(
-              image: AssetImage(path),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10,),
-        Text(
-          value,
-          style: TextStyle(color: color, fontSize: fontSize),
-        ),
-        Text(
-          label,
-          style: TextStyle(color: color),
-        ),
-      ],
-    );
-  }
-
-  String getWindSpeed(double? windSpeed, BuildContext context) {
-    final weatherProvider = Provider.of<WeatherProvider>(context);
-    String u = weatherProvider.unit;
-
-    if (windSpeed == null) return 'N/A';
-    if (u == "°") {
-      return '${windSpeed.toStringAsFixed(1)} m/s'; // For metric (m/s)
-    } else if (u == "F") {
-      double ws= windSpeed * 2.237;
-      return '${ws.toStringAsFixed(1)} mph'; // For imperial (mph)
-    } else {
-      return 'N/A';
-    }
-  }
-
-  String getWindSpeedDescription(double? windSpeed) {
-    if (windSpeed == null) return 'N/A';
-
-    if (windSpeed < 0.3) return 'Calm';
-    if (windSpeed < 1.5) return 'Light Air';
-    if (windSpeed < 3.3) return 'Light Breeze';
-    if (windSpeed < 5.5) return 'Gentle Breeze';
-    if (windSpeed < 7.9) return 'Moderate Breeze';
-    if (windSpeed < 10.7) return 'Fresh Breeze';
-    if (windSpeed < 13.8) return 'Strong Breeze';
-    if (windSpeed < 17.1) return 'High Wind';
-    return 'Gale or Stronger';
-  }
 }
+
 // class WavyClipper extends CustomClipper<Path> {
 //   @override
 //   Path getClip(Size size) {
