@@ -13,11 +13,12 @@ import 'Api.dart';
 class WeatherProvider with ChangeNotifier {
   // Private Variables
   final WeatherFactory wf = WeatherFactory(openWeatherApiKey);
-  String _city = "";
+  String _city = "default";
 
-  DateTime? _cityLocalTime;
-  DateTime? _citySunrise;
-  DateTime? _citySunset;
+  DateTime _cityLocalTime = DateTime.now();
+  DateTime _citySunrise = DateTime.now();
+  DateTime _citySunset = DateTime.now();
+
   String _unit = "°";
   String _forecastunit = "metric";
   Weather? _weather;
@@ -52,6 +53,8 @@ class WeatherProvider with ChangeNotifier {
   int get timezoneOffset => _timezoneOffset;
   bool _isConnected = true;
   bool get isConnected => _isConnected;
+
+
   set isconnected(bool value) { // Setter to modify the value
     _isConnected = value;
 
@@ -96,6 +99,7 @@ class WeatherProvider with ChangeNotifier {
           _error = null; // Ensure error is cleared if the fetch is successful
           _cityerror = null;
         } else {
+
           _error = "Failed to fetch timezone offset";
         }
       } catch (e) {
@@ -179,17 +183,18 @@ class WeatherProvider with ChangeNotifier {
     }
 
     final List<Map<String, dynamic>> result = [];
-    final today = DateTime.now();
+    final today = _cityLocalTime;
+
+
     final normalizedToday =
-        DateTime(today.year, today.month, today.day); // Normalize to 00:00
-    // print(normalizedToday);
+    DateTime(today.year, today.month, today.day);
     int count = 0;
 
     for (var date in groupedForecast.keys) {
       final forecastDate = DateTime.parse(date);
 
       if (forecastDate.isBefore(normalizedToday)) {
-        continue; // Skip past dates
+        continue;
       }
 
       final dayForecast = groupedForecast[date]!;
@@ -202,25 +207,25 @@ class WeatherProvider with ChangeNotifier {
           .reduce((a, b) => a < b ? a : b);
 
       final morning = dayForecast.firstWhere(
-        (item) => item['dt_txt'].contains('09:00:00'),
+            (item) => item['dt_txt'].contains('09:00:00'),
         orElse: () => defaultMap,
       );
       final noon = dayForecast.firstWhere(
-        (item) => item['dt_txt'].contains('12:00:00'),
+            (item) => item['dt_txt'].contains('12:00:00'),
         orElse: () => defaultMap,
       );
 
       final afternoon = dayForecast.firstWhere(
-        (item) => item['dt_txt'].contains('15:00:00'),
+            (item) => item['dt_txt'].contains('15:00:00'),
         orElse: () => defaultMap,
       );
 
       final evening = dayForecast.firstWhere(
-        (item) => item['dt_txt'].contains('18:00:00'),
+            (item) => item['dt_txt'].contains('18:00:00'),
         orElse: () => defaultMap,
       );
       final night = dayForecast.firstWhere(
-        (item) => item['dt_txt'].contains('21:00:00'),
+            (item) => item['dt_txt'].contains('21:00:00'),
         orElse: () => defaultMap,
       );
 
@@ -252,7 +257,7 @@ class WeatherProvider with ChangeNotifier {
       'speed': 0.0,
     },
     'weather': [
-      {'description': 'Not available'},
+      {'description': 'Not'},
     ],
   };
 // Toggle Unit and city function
@@ -350,16 +355,17 @@ class WeatherProvider with ChangeNotifier {
     notifyListeners();
   }
   bool _isNight() {
-    final now = _cityLocalTime; // Current time in the city
+    final now = _cityLocalTime;
     final sunrise = _citySunrise;
     final sunset = _citySunset;
-    // print(now);
-    if (now!.isAfter(sunset!) || now.isBefore(sunrise!)) {
+
+    if (now.isAfter(sunset) || now.isBefore(sunrise)) {
       return true;
     } else {
       return false;
     }
   }
+
 
 
   bool isExpanded(String key) {
@@ -513,9 +519,6 @@ class WeatherProvider with ChangeNotifier {
     'United Kingdom',
     'Turkey'
   ];
-
-
-
 
 
 

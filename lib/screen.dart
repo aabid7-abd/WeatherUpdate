@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -26,17 +25,22 @@ class _HomescreenState extends State<Homescreen> {
     try {
       WeatherProvider weather =
           Provider.of<WeatherProvider>(context, listen: false);
+
       String city = await getCityName();
-      if (city == "" || city == "Ganderbal") {
+      if (city=="default" || city == "Ganderbal") {
         weather.setCity = "Srinagar";
-        await weather.fetchd();
-        await weather.fetchForecast();
+
       } else {
         weather.setCity = city;
-        await weather.fetchd();
-        await weather.fetchForecast();
+
       }
+      await weather.fetchd();
+      await weather.fetchForecast();
+
     } catch (e) {
+
+
+
       // print("Error in fetchWeatherData: $e");
     }
   }
@@ -80,10 +84,19 @@ class _HomescreenState extends State<Homescreen> {
   Widget build(BuildContext context) {
     final weatherProvider = Provider.of<WeatherProvider>(context);
 
-    return weatherProvider.weather == null && weatherProvider.forecast == null
+    return
+
+
+      weatherProvider.weather == null && weatherProvider.forecast == null
         ? Scaffold(
-            backgroundColor: Colors.white,
-            body: buildErrorUI('Fetching data......'))
+            backgroundColor: Colors.blueGrey,
+            body:
+            buildErrorUI(
+              'Oh no! It seems I’m having trouble checking the weather.\n'
+                  'Could you please check your connection while I try again?',
+              context,
+            )
+      )
         : weatherProvider.cityerror != null
             ? Scaffold(
                 body: Stack(
@@ -156,25 +169,23 @@ class _HomescreenState extends State<Homescreen> {
     double tempfeelslike = weatherProvider
         .getTemp(weatherProvider.weather?.tempFeelsLike?.celsius ?? 0.0);
 
-
-    return
-      Stack(
+    return Stack(
       children: [
-
-        weatherProvider.weather?.weatherDescription=='clear sky'?weatherProvider.isNight?
-          Positioned.fill(
-            child: Lottie.asset(
-              'assets/lottie/lo.json',
-              fit: BoxFit.cover, // Cover the entire background
-            ),
-          ):Positioned.fill(
-         child: Lottie.asset(
-           'assets/lottie/clearday.json',
-           fit: BoxFit.cover, // Cover the entire background
-         ),
-       ): buildWeatherBackground(weatherProvider),
-
-
+        weatherProvider.weather?.weatherDescription == 'clear sky'
+            ? weatherProvider.isNight
+                ? Positioned.fill(
+                    child: Lottie.asset(
+                      'assets/lottie/lo.json',
+                      fit: BoxFit.cover, // Cover the entire background
+                    ),
+                  )
+                : Positioned.fill(
+                    child: Lottie.asset(
+                      'assets/lottie/clearday.json',
+                      fit: BoxFit.cover, // Cover the entire background
+                    ),
+                  )
+            : buildWeatherBackground(weatherProvider),
         Positioned(
           top: 0,
           left: 0,
@@ -200,7 +211,10 @@ class _HomescreenState extends State<Homescreen> {
                       padding: EdgeInsets.only(left: 10.0, top: 10),
                       child: Text(
                         'Now',
-                        style: TextStyle(color: Colors.white, fontSize: 25,fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700),
                       ),
                     ),
                     _currentInfo(),
@@ -211,6 +225,14 @@ class _HomescreenState extends State<Homescreen> {
                                     " ")
                             .withOpacity(0.6),
                         child: _extraCurrentInfo()),
+                      Padding(
+                       padding: const EdgeInsets.only(top: 12.0),
+                       child: Text('5 day Forecast',style: TextStyle(fontWeight: FontWeight.w800,fontSize: 17,color:
+                       weatherProvider.isNight?Colors.white:Colors.white)
+
+                         ,
+                       ),
+                     )
                   ],
                 ),
               ),
@@ -218,8 +240,7 @@ class _HomescreenState extends State<Homescreen> {
           ),
         ),
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.25,
-
+          top: 220,
           right: 20,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -228,13 +249,13 @@ class _HomescreenState extends State<Homescreen> {
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center
-                  ,crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       weatherProvider.weather?.weatherDescription != null
                           ? capitalizeEachWord(
-                          weatherProvider.weather!.weatherDescription!)
+                              weatherProvider.weather!.weatherDescription!)
                           : 'No description available',
                       style: const TextStyle(
                         fontSize: 15,
@@ -249,15 +270,21 @@ class _HomescreenState extends State<Homescreen> {
                           fontSize: 15,
                           fontWeight: FontWeight.w600),
                     ),
-
-                    sun('r',DateFormat("h:mm a").format(
-                        weatherProvider.citySunrise ?? DateTime.now()),'assets/icons/sr2.png',context),
+                    sun(
+                        'r',
+                        DateFormat("h:mm a").format(
+                            weatherProvider.citySunrise ?? DateTime.now()),
+                        'assets/icons/sr2.png',
+                        context),
                     const SizedBox(
                       height: 5,
                     ),
-                    sun('s',DateFormat("h:mm a").format(
-                        weatherProvider.citySunset ?? DateTime.now()),'assets/icons/sunset-2.png',context)
-
+                    sun(
+                        's',
+                        DateFormat("h:mm a").format(
+                            weatherProvider.citySunset ?? DateTime.now()),
+                        'assets/icons/sunset-2.png',
+                        context)
                   ],
                 ),
               ),
@@ -340,7 +367,7 @@ class _HomescreenState extends State<Homescreen> {
         Row(
           children: [
             Text(
-                '   Today, ${DateFormat("d MMM y").format(now)}, ${DateFormat("h:mm a").format(now)}',
+                '       ${DateFormat('EEEE ').format(now)}${DateFormat("d MMM y").format(now)}, ${DateFormat("h:mm a").format(now)}',
                 style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.w700)),
           ],
@@ -358,7 +385,13 @@ class _HomescreenState extends State<Homescreen> {
       children: [
         Text(
           temperature.toStringAsFixed(0),
-          style:  TextStyle(color: weatherProvider.isNight && weatherProvider.weather?.weatherDescription=="clear sky"?const Color(0xff0f2027):Colors.white, fontSize: 100,fontWeight: FontWeight.w700),
+          style: TextStyle(
+              color: weatherProvider.isNight &&
+                      weatherProvider.weather?.weatherDescription == "clear sky"
+                  ? const Color(0xff0f2027)
+                  : Colors.white,
+              fontSize: 100,
+              fontWeight: FontWeight.w700),
         ),
         Padding(
           padding: const EdgeInsets.only(bottom: 65.0),
@@ -367,7 +400,10 @@ class _HomescreenState extends State<Homescreen> {
             style: const TextStyle(color: Colors.white, fontSize: 40),
           ),
         ),
-        weatherProvider.isNight && weatherProvider.weather?.weatherDescription=="clear sky"?const SizedBox(): buildWeatherIcon(weatherProvider),
+        weatherProvider.isNight &&
+                weatherProvider.weather?.weatherDescription == "clear sky"
+            ? const SizedBox()
+            : buildWeatherIcon(weatherProvider),
       ],
     );
   }
@@ -477,12 +513,8 @@ class _HomescreenState extends State<Homescreen> {
           },
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: index == 0
-                  ? Colors.grey.shade50
-                  : index == 1
-                      ? Colors.grey.shade100
-                      : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.grey.shade200,
             ),
             margin: const EdgeInsets.only(bottom: 40),
             child: Padding(
@@ -491,36 +523,14 @@ class _HomescreenState extends State<Homescreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  index == 0
-                      ? SizedBox(
-                          width: 150,
-                          child: Text(
-                            'Today${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          ),
-                        )
-                      : index == 1
-                          ? SizedBox(
-                              width: 150,
-                              child: Text(
-                                'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black),
-                              ),
-                            )
-                          : Text(
-                              "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
+                  Text(
+                    "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
                   SizedBox(
                     width: 150,
                     child: Card(
@@ -589,36 +599,21 @@ class _HomescreenState extends State<Homescreen> {
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                index == 0
-                    ? Text(
-                        'Today${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black),
-                      )
-                    : index == 1
-                        ? Text(
-                            'Tomorrow${DateFormat(" d MMM ").format(DateTime.parse(forecastDay['date']))}',
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
-                          )
-                        : Text(
-                            "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
+                Text(
+                  "${DateFormat('EEEE ').format(DateTime.parse(forecastDay['date']))}${DateFormat('d MMM ').format(DateTime.parse(forecastDay['date']))}",
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
                 const SizedBox(
                   height: 20,
                 ),
+
                 _buildWeatherForecastSection(
                   index!,
-                  "Morning   ",
+                  "Morning",
                   forecastDay['morning'],
                   windSpeedM,
                   weatherProvider.unit,
@@ -626,7 +621,7 @@ class _HomescreenState extends State<Homescreen> {
                 ),
                 _buildWeatherForecastSection(
                   index,
-                  "Noon         ",
+                  "Noon",
                   forecastDay['noon'],
                   windSpeedNoon,
                   weatherProvider.unit,
@@ -642,7 +637,7 @@ class _HomescreenState extends State<Homescreen> {
                 ),
                 _buildWeatherForecastSection(
                   index,
-                  "Evening    ",
+                  "Evening",
                   forecastDay['evening'],
                   windSpeedE,
                   weatherProvider.unit,
@@ -650,7 +645,7 @@ class _HomescreenState extends State<Homescreen> {
                 ),
                 _buildWeatherForecastSection(
                   index,
-                  "Night        ",
+                  "Night",
                   forecastDay['night'],
                   windSpeednight,
                   weatherProvider.unit,
@@ -682,24 +677,24 @@ class _HomescreenState extends State<Homescreen> {
 
   Widget _buildWeatherForecastSection(
     int index,
-    String timeOfDay,
+    String time,
     dynamic forecast,
     double? windSpeed,
     String unit,
     WeatherProvider weather,
   ) {
-    final sectionKey = '$index-$timeOfDay';
+    final sectionKey = '$index-$time';
 
     double temp = forecast['main']['temp']?.toDouble() ?? 0.0;
     double convertedTemp = weather.getTemp(temp);
     double humid = forecast['main']['humidity']?.toDouble() ?? 0.0;
     double pres = forecast['main']['sea_level']?.toDouble() ?? 0.0;
     String weatherDescription =
-        forecast['weather'][0]['description'] ?? "Not available";
+        forecast['weather'][0]['description'] ?? "Not";
 
     return SizedBox(
       width: MediaQuery.of(context).size.width * 1,
-      child: weatherDescription == "Not available"
+      child: weatherDescription == "Not"
           ? const SizedBox(
               height: 2,
             )
@@ -715,12 +710,15 @@ class _HomescreenState extends State<Homescreen> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text(
-                          timeOfDay,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black.withOpacity(0.6),
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            time,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black.withOpacity(0.6),
+                            ),
                           ),
                         ),
                         IconButton(
@@ -747,14 +745,13 @@ class _HomescreenState extends State<Homescreen> {
                                       width: 50, height: 50);
                                 },
                               )
-                            : timeOfDay == "Morning" || timeOfDay == "Afternoon"
-                                ? Container(
-                                    width: 50,
-                                    height: 50,
+                            :(time == 'Evening' || time == 'Night')?  Container(
+                                    width: 30,
+                                    height: 30,
                                     decoration: const BoxDecoration(
                                       image: DecorationImage(
                                         image:
-                                            AssetImage('assets/icons/sun.png'),
+                                            AssetImage('assets/icons/moon.png'),
                                       ),
                                     ),
                                   )
@@ -764,7 +761,7 @@ class _HomescreenState extends State<Homescreen> {
                                     decoration: const BoxDecoration(
                                       image: DecorationImage(
                                         image:
-                                            AssetImage('assets/icons/moon.png'),
+                                            AssetImage('assets/icons/sun.png'),
                                       ),
                                     ),
                                   ),
@@ -775,7 +772,6 @@ class _HomescreenState extends State<Homescreen> {
                             input: capitalizeEachWord(weatherDescription)),
                       ],
                     ),
-                    const SizedBox(width: 5),
                     buildWeatherInfoColumn(
                       value: '${convertedTemp.toInt()} $unit',
                       label: 'Temperature',

@@ -1,13 +1,12 @@
 // main.dart
-import 'dart:convert';
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forecast/screen.dart';
 
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import '../Api.dart';
 import 'StateManage.dart';
 Future<void> main() async {
 

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:weather_animation/weather_animation.dart';
 
@@ -19,18 +22,38 @@ String getWindSpeed(double? windSpeed, BuildContext context) {
   }
 }
 
-Widget buildErrorUI(String message) {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const CircularProgressIndicator(
-          color: Colors.blue,
+Widget buildErrorUI(String message, BuildContext context) {
+  final weatherProvider = Provider.of<WeatherProvider>(context);
+
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      SizedBox(
+          width: MediaQuery.of(context).size.width,
+
+          child: Lottie.asset('assets/lottie/splash.json')),
+      // buildText(input: message, color: Colors.white),
+      !weatherProvider.isConnected? Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Card(
+          shadowColor: Colors.white,
+          elevation: 22,
+          color: Colors.black,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: AnimatedText(
+              text: message,
+              style: const TextStyle(fontSize: 18, color: Colors.white),
+              duration: const Duration(milliseconds: 150),
+            ),
+          ),
         ),
-        Text(message, style: const TextStyle(color: Colors.black)),
-      ],
-    ),
+      ):buildText(input: 'Fetching......', color: Colors.black)
+
+    ],
   );
+
 }
 
 Color getColorBasedOnWeather(String description) {
@@ -54,7 +77,7 @@ Color getColorBasedOnWeather(String description) {
     case 'thunderstorm':
       return Colors.indigo; // For thunderstorm
     case 'mist':
-      return Color(0xffbcc8d3);
+      return const Color(0xffbcc8d3);
 
     case 'haze':
       return const Color(0xffd7ccc8);
@@ -100,8 +123,8 @@ Widget sun(String p,String text,String path, BuildContext context) {
       const SizedBox(
         width: 5,
       ),
-      buildText(input:text,color: Colors.white),
 
+      buildText(input: text,color: Colors.white)
     ],
 
   );
@@ -420,5 +443,56 @@ String getPressureLevel(double pressureHpa) {
     return "Normal";
   } else {
     return "High";
+  }
+}
+
+
+
+class AnimatedText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  final Duration duration;
+
+  const AnimatedText({
+    Key? key,
+    required this.text,
+    this.style,
+    this.duration = const Duration(milliseconds: 50),
+  }) : super(key: key);
+
+  @override
+  _AnimatedTextState createState() => _AnimatedTextState();
+}
+
+class _AnimatedTextState extends State<AnimatedText> {
+  String _displayedText = '';
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAnimation();
+  }
+
+  void _startAnimation() {
+    Timer.periodic(widget.duration, (timer) {
+      if (_currentIndex < widget.text.length) {
+        setState(() {
+          _displayedText += widget.text[_currentIndex];
+          _currentIndex++;
+        });
+      } else {
+        timer.cancel();
+
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _displayedText,
+      style: widget.style ?? const TextStyle(fontSize: 14, color: Colors.black),
+    );
   }
 }
